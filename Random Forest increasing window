@@ -1,0 +1,700 @@
+#import .txt and packages to python
+import pandas as pd
+from matplotlib import pyplot as plt
+import numpy as np
+from tqdm import tqdm
+import sklearn
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.model_selection import train_test_split
+import scipy.stats as stats
+from sklearn.metrics import mean_absolute_error
+from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import KFold
+from sklearn.model_selection import RandomizedSearchCV
+import datetime
+import shap
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from scipy.stats import randint
+
+df = pd.read_csv("/Users/yannickarfaoui/dataset_module_10.txt", delimiter=" ", low_memory=False)
+df['CALDT'] = pd.to_datetime(df['CALDT'])
+
+#Drop blanks from FUND_NAME
+df = df.dropna(axis=0, subset=['FUND_NAME'])
+
+#Set FRONT and REAR Loads NaN entries to zero
+values = {'REAR_LOAD': 0, 'FRONT_LOAD': 0}
+df = df.fillna(value=values)
+
+#Only funds with FRONT_LOAD & REAR_LOAD of zero
+df = df[df.FRONT_LOAD == 0]
+df = df[df.REAR_LOAD == 0]
+
+#Drop FRONT_LOAD and REAR_LOAD Columns
+df = df.drop(['FRONT_LOAD', 'REAR_LOAD'], axis=1)
+
+#Only funds over 35 months in age 
+df = df[df.Age > 35]
+
+#Only funds over 70% in Equities
+df = df[df.ALL_EQ > 70]
+
+#US funds filter step 01 according to CRSP documentation
+df = df[df['CRSP_OBJ_CD'].str.startswith('ED', na = False)]
+#Filter out funds with hedge fund strategies according to CRSP documentation
+hedge_strategies = ['EDYH', 'EDYS']
+df = df[~df['CRSP_OBJ_CD'].isin(hedge_strategies)]
+
+#Filter out all index funds
+#-----------------------------------------#
+
+#Create a copy to avoid potential errors with original dataframe
+df1 = df.copy()
+#Convert the values in the CLADT to datetime
+df1.loc[:, 'CALDT'] = pd.to_datetime(df['CALDT'])
+
+#Now create the two dataframes before and after the 'D' index was introduced
+df1_1 = df1[df1['CALDT'] < pd.to_datetime('2003-06-30')]
+df1_2 = df1[df1['CALDT'] >= pd.to_datetime('2003-06-30')]
+#Filter out index funds from dataframe which has index fund flag
+df1_3 = df1_2[df1_2.INDEX_FUND_FLAG != 'D']
+#Filer out index funds prior to index fund flag
+dfx = df1_1.drop(df1_1[df1_1.FUND_NAME.str.contains('Index')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Idx')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Ix')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Indx')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('NASDAQ')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Nasdaq')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Dow')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('Mkt')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('DJ')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('S&P 500')].index)
+dfx = dfx.drop(dfx[dfx.FUND_NAME.str.contains('BARRA')].index)
+#Concatenate the two dataframes back together
+df1 = pd.concat([dfx, df1_3], axis=0)
+
+#Create boolean columns which return whether fund is managed by team or single manager
+df1 = df1.reindex(df1.columns.tolist() + ['IS_TEAM','NOT_TEAM'], axis=1)
+#Create dummy variable for IS_TEAM
+df1['IS_TEAM'] = np.where(df1['MANAGER_MSTAR'].str.contains('/', na = False) == True, 1, 0)
+#Create dummy variable for NOT_TEAM
+df1['NOT_TEAM'] = np.where(df1['IS_TEAM'] == 1, 0, 1)
+#Drop MANAGER_MSTAR column
+df1 = df1.drop('MANAGER_MSTAR', axis=1)
+
+#Filter out fund rows prior to them reaching 5 million in assets under management
+#-----------------------------------------#
+
+#Create a list with dataframes for each fund 
+portfolio_NO = df1["CRSP_FUNDNO"].unique()
+list_filtering = [df1[df1["CRSP_FUNDNO"] == i].reset_index(drop = True) for i in tqdm(portfolio_NO)]
+
+#Delete observations 
+portfolios_sample = []
+
+for df_ in tqdm(list_filtering):
+    tmp = df_
+    if tmp["MTNA"].max() >= 5:
+        mask = tmp[tmp["MTNA"] >= 5]
+        portfolios_sample.append(tmp.iloc[mask.index[0]:])
+
+#Combine sample again
+sample = pd.concat(portfolios_sample, axis = 0)
+    
+#Make a copy of sample as df2
+df2 = sample.copy()
+
+#Data preparation for ML models
+#Drop unnecessary columns
+drop_columns = ['FUND_NAME', 'INDEX_FUND_FLAG', 'ET_FLAG', 'CRSP_OBJ_CD', 'flows', 'FIRST_OFFER_DT', 'TERMINATION_DT']
+df2 = df2.drop(columns=drop_columns)
+
+#Sort the dates column from lowest to highest
+df2 = df2.sort_values(by = 'CALDT')
+
+#Shift the t_alpha_FF5MOM back by one month for prediciton
+df2['alpha_FF5MOM_shifted'] = df2.groupby('CRSP_FUNDNO')['alpha_FF5MOM'].shift(-12)
+
+#CHECK NaN in T_alpha_FF5MOM & REPLACE WITH 0 
+df2["alpha_FF5MOM"]=df2["alpha_FF5MOM"].fillna(0)
+df2["alpha_FF5MOM_shifted"]=df2["alpha_FF5MOM_shifted"].fillna(0)
+
+
+#Drop NaN values from dataframe for linear regression
+df2 = df2.dropna()
+
+#Create data frame containing only Index and CALDT
+df_date = df2[['CALDT', "CRSP_FUNDNO"]]
+
+
+period = pd.date_range(pd.to_datetime("1998-11-30"),
+                       pd.to_datetime("2020-12-31"),
+                       freq = "M")
+
+
+period_true = period[::12]
+
+
+
+#top_decile_decision_tree = []
+#all_crsp_fundno = []
+#decision_tree_predictions_all = []
+portfolio_list =[]
+bottom_portfolio_list = []
+top_asset_weighted_portfolio_list =[]
+bottom_asset_weighted_portfolio_list =[]
+num_of_fund_per_portfolio =[]
+bottom_num_fund_per_portfolio = []
+all_top_decile_monthly = pd.DataFrame(columns=['CRSP_FUNDNO', 'CALDT', 'MRET', 'weighted_return'])
+all_bottom_decile_monthly = pd.DataFrame(columns=['CRSP_FUNDNO', 'CALDT', 'MRET', 'weighted_return'])
+all_top_asset_weighted_monthly = pd.DataFrame(columns=['CRSP_FUNDNO', 'CALDT', 'MRET', 'asset_weighted_return'])
+all_bottom_asset_weighted_monthly = pd.DataFrame(columns=['CRSP_FUNDNO', 'CALDT', 'MRET', 'asset_weighted_return'])
+
+
+# Lists to store SHAP values
+all_shap_values = []
+
+portfolios = pd.DataFrame(np.nan, index=[0, 1, 2, 3], columns=['prediction', 'CRSP_FUNDNO'])
+
+portfolios_low_alpha = pd.DataFrame(np.nan, index=[0, 1, 2, 3], columns=['prediction', 'CRSP_FUNDNO'])
+
+for i in tqdm (range(len(period_true))):
+    
+    # Split data into training and test data
+    df2_1 = df2[df2['CALDT'] <= period_true[i]]
+    df2_2 = df2[df2['CALDT'] == period_true[i] + pd.offsets.MonthEnd(13)]
+    df2_2 = df2_2.reset_index(drop=True)
+
+    df2_abc = df2[df2['CALDT'] >= period_true[i]]
+    columns_to_keep = ['CRSP_FUNDNO', 'CALDT', 'MRET']
+    df2_abc = df2_abc.loc[:, columns_to_keep]
+
+    # Drop CLADT columns from the new dataframes
+    training_data = df2_1.drop(['CALDT'], axis=1)
+    testing_data = df2_2.drop(['CALDT'], axis=1)
+    x_train = training_data.drop(["alpha_FF5MOM_shifted"], axis=1)
+    y_train = training_data["alpha_FF5MOM_shifted"]
+    x_test = testing_data.drop(["alpha_FF5MOM_shifted"], axis=1)
+    x_test_date = df2_2.drop(["alpha_FF5MOM_shifted"], axis=1)
+
+    # Hyperparameters for randomizedgridsearch
+    param_dist = {
+        "max_depth": randint(5, 70),
+        "max_features": randint(5, 20),
+        "min_samples_leaf": randint(5,20),
+        "n_estimators": randint(50,200),
+        #"n_iter" : [30,50,100],
+        #"criterion": ["gini"]
+        }
+
+
+    # Random Forest model
+    random_forest = RandomForestRegressor(random_state=42, n_jobs=-1)
+
+    # Initiate kfold function with 5 folds, shuffled, and random state = 42
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+    # Perform Randomized Search CV on the training data for Random Forest
+    random_search = RandomizedSearchCV(estimator=random_forest, param_distributions=param_dist,
+                                       scoring='neg_mean_squared_error', cv=kf)
+    
+    result = random_search.fit(x_train, y_train)
+
+    # Get the best model from Randomized Search CV
+    best_random_forest_model = random_search.best_estimator_
+    print(best_random_forest_model)
+
+    # Show the best hyperparameters
+    print('Best Hyperparameters: %s' % result.best_params_)
+    print(result.best_params_)
+
+    # Train model using the best model
+    random_forest = best_random_forest_model.fit(x_train, y_train)
+    random_forest_prediction = random_forest.predict(x_test)
+
+    # Initialize the SHAP explainer with the trained model
+    explainer = shap.Explainer(random_forest)
+
+    # Calculate the SHAP values for the testing data
+    shap_values = explainer.shap_values(x_test)
+
+    # Calculate the absolute SHAP values for each feature
+    abs_shap_values = np.abs(shap_values)
+
+    # Append SHAP values in a list
+    all_shap_values.append(shap_values)
+
+    # Portfolio creation
+    Prediction_test = pd.DataFrame({
+        "prediction": random_forest_prediction,
+        "CRSP_FUNDNO": x_test["CRSP_FUNDNO"],
+        "CALDT": x_test_date["CALDT"],
+        "MRET": x_test["MRET"]
+    })
+
+    
+    # Sort Prediction_test according to prediction
+    Prediction_test_sorted = Prediction_test.sort_values(by='prediction', ascending=False)
+    
+    # Select top ten percent of funds
+    # 90th percentile of predictions
+    decile_threshold = Prediction_test['prediction'].quantile(0.9)
+    
+    # 10th percentile of predictions
+    bottom_decile_threshold = Prediction_test['prediction'].quantile(0.1)
+    
+    # DataFrame with only the top 10% of funds
+    top_decile_df = Prediction_test[Prediction_test['prediction'] >= decile_threshold]
+    top_decile_df['CALDT'] = pd.to_datetime(top_decile_df['CALDT'])
+    print(len(top_decile_df))
+    
+    # DataFrame with only the bottom 10% of funds
+    bottom_decile_df = Prediction_test[Prediction_test['prediction'] <= bottom_decile_threshold]    
+    bottom_decile_df['CALDT'] = pd.to_datetime(bottom_decile_df['CALDT'])
+
+    # Append top decile to the top portfolios over time
+    portfolios = pd.concat([portfolios, top_decile_df])
+    
+    # Append bottom decile to the low portfolios
+    portfolios_low_alpha = pd.concat([portfolios_low_alpha, bottom_decile_df])
+    
+    # Extract the year from the 'CALDT' column
+    portfolios['Year'] = portfolios['CALDT'].dt.year
+    
+    # Same for bottom decile
+    portfolios_low_alpha['Year'] = portfolios_low_alpha['CALDT'].dt.year
+    
+    # Group by the 'Year' column and assign a common index for each group
+    portfolios['CommonIndex'] = portfolios.groupby('Year').ngroup()
+    
+    # Same for bottom decile
+    portfolios_low_alpha['CommonIndex'] = portfolios_low_alpha.groupby('Year').ngroup()
+    
+    # Set the 'CommonIndex' column as the index
+    portfolios.set_index('CommonIndex', inplace=True)
+    
+    # Same for bottom decile
+    portfolios_low_alpha.set_index('CommonIndex', inplace=True)
+    
+    # Get all the monthly return for the corresponding year
+    top_decile_monthly = df2_abc[df2_abc['CRSP_FUNDNO'].isin(top_decile_df['CRSP_FUNDNO']) & (df2_abc['CALDT'].dt.year.isin(top_decile_df['CALDT'].dt.year))]
+    
+    # Same for bottom decile
+    bottom_decile_monthly = df2_abc[df2_abc['CRSP_FUNDNO'].isin(bottom_decile_df['CRSP_FUNDNO']) & (df2_abc['CALDT'].dt.year.isin(bottom_decile_df['CALDT'].dt.year))]
+    
+    # Return of portfolios
+    weight = 1/len(top_decile_df)
+    
+    # Same for bottom decile
+    weight_bottom = 1/len(bottom_decile_df)
+    
+    # Calculate weighted return for each row
+    top_decile_monthly['weighted_return'] = top_decile_monthly['MRET'] * weight
+    
+    # Same for bottom decile
+    bottom_decile_monthly['weighted_return'] = bottom_decile_monthly['MRET'] * weight_bottom
+    
+    # Calculate the return for each fund
+    weighted_returns_by_fund = top_decile_monthly.groupby('CRSP_FUNDNO')['weighted_return'].sum()
+    
+    portfolio_return = top_decile_monthly['weighted_return'].sum()
+    print("The return of the portfolio number", i, "is", portfolio_return)
+    
+    # Same for bottom decile
+    bottom_weighted_return_by_fund = bottom_decile_monthly.groupby('CRSP_FUNDNO')['weighted_return'].sum()
+    
+    bottom_portfolio_return = bottom_decile_monthly['weighted_return'].sum()
+    
+    # List of each portfolio return
+    portfolio_list.append(portfolio_return)
+    
+    # Same for bottom decile
+    bottom_portfolio_list.append(bottom_portfolio_return)
+    
+    # Count the number of fund in each portfolio + at the end show min, max and avg of nb of portfolio
+    num_funds_in_portfolio = len(top_decile_df['CRSP_FUNDNO'])
+    num_of_fund_per_portfolio.append(num_funds_in_portfolio)
+    
+    # Same for bottom decile
+    bottom_num_fund_in_portfolio = len(bottom_decile_df['CRSP_FUNDNO'])
+    bottom_num_fund_per_portfolio.append(bottom_num_fund_in_portfolio)
+
+    
+    ########### asset weighted computation ##########
+
+    top_decile_df['top_asset_weight']= top_decile_df['prediction']/ top_decile_df['prediction'].sum()
+    bottom_decile_df['bottom_asset_weight']= bottom_decile_df['prediction']/ bottom_decile_df['prediction'].sum()
+    
+    # Convert the 'CALDT' column to a datetime object and extract the year
+    top_decile_monthly['year'] = pd.to_datetime(top_decile_monthly['CALDT']).dt.year
+    
+    # Convert the 'CALDT' column to a datetime object and extract the year
+    top_decile_df['year'] = pd.to_datetime(top_decile_df['CALDT']).dt.year
+    
+    # Merge the dataframes based on the 'CRSP_FUNDNO' and 'year' columns
+    top_asset_weighted_merged_df = pd.merge(top_decile_monthly, top_decile_df[['CRSP_FUNDNO', 'year', 'top_asset_weight']], on=['CRSP_FUNDNO', 'year'], how='left')
+    
+    # Convert the 'CALDT' column to a datetime object and extract the year
+    bottom_decile_monthly['year'] = pd.to_datetime(bottom_decile_monthly['CALDT']).dt.year
+    
+    # Convert the 'CALDT' column to a datetime object and extract the year
+    bottom_decile_df['year'] = pd.to_datetime(bottom_decile_df['CALDT']).dt.year
+    
+    # Merge the dataframes based on the 'CRSP_FUNDNO' and 'year' columns
+    bottom_asset_weighted_merged_df = pd.merge(bottom_decile_monthly, bottom_decile_df[['CRSP_FUNDNO', 'year', 'bottom_asset_weight']], on=['CRSP_FUNDNO', 'year'], how='left')
+    
+    # Calculate weighted return for each row
+    top_asset_weighted_merged_df['asset_weighted_return'] = top_asset_weighted_merged_df['MRET'] * top_asset_weighted_merged_df['top_asset_weight'] #top_weight_asset
+    
+    #Same for bottom decile
+    bottom_asset_weighted_merged_df['asset_weighted_return'] = bottom_asset_weighted_merged_df['MRET'] * bottom_asset_weighted_merged_df['bottom_asset_weight']
+    
+    #Calculate the return for each fund
+    top_asset_weighted_returns_by_fund = top_asset_weighted_merged_df.groupby('CRSP_FUNDNO')['asset_weighted_return'].sum()
+    
+    top_weighted_portfolio_return_asset= top_asset_weighted_merged_df['asset_weighted_return'].sum()
+    print("The return of the portfolio number", i,"is", top_weighted_portfolio_return_asset)
+    
+    # Same for bottom decile
+    bottom_asset_weighted_return_by_fund = bottom_asset_weighted_merged_df.groupby('CRSP_FUNDNO')['asset_weighted_return'].sum()
+    
+    bottom_weighted_portfolio_return_asset = bottom_asset_weighted_merged_df['asset_weighted_return'].sum()
+    print("The return of the portfolio number", i,"is", bottom_weighted_portfolio_return_asset)
+    
+    # List of each portfolio return
+    top_asset_weighted_portfolio_list.append(top_weighted_portfolio_return_asset)
+    
+    # same for bottom decile
+    bottom_asset_weighted_portfolio_list.append(bottom_weighted_portfolio_return_asset)
+    
+    all_top_decile_monthly = pd.concat([all_top_decile_monthly, top_decile_monthly], ignore_index=False)
+    all_bottom_decile_monthly = pd.concat([all_bottom_decile_monthly, bottom_decile_monthly], ignore_index=False)
+    all_top_asset_weighted_monthly = pd.concat([all_top_asset_weighted_monthly, top_asset_weighted_merged_df],ignore_index=False)
+    all_bottom_asset_weighted_monthly = pd.concat([all_bottom_asset_weighted_monthly, bottom_asset_weighted_merged_df],ignore_index=False)
+    
+
+
+
+########## Portfolio Analysis of Performance ##########
+
+########## Equally weighted portfolio ###########
+
+# Keep only the sum of returns for each month
+# Group by 'CALDT' and calculate the sum for each group, keeping the DataFrame format
+top_monthly_return = all_top_decile_monthly.groupby(pd.Grouper(key='CALDT', freq='M')).agg({'weighted_return': 'sum'})
+top_monthly_return = top_monthly_return.reset_index()
+
+bottom_monthly_return = all_bottom_decile_monthly.groupby(pd.Grouper(key='CALDT', freq='M'))['weighted_return'].sum()
+bottom_monthly_return = bottom_monthly_return.reset_index()
+
+# Calculate Log returns of Top Decile Portfolio
+top_monthly_return['log_weighted_return'] = np.log(1 + top_monthly_return['weighted_return'])
+bottom_monthly_return['log_weighted_return'] = np.log(1 + bottom_monthly_return['weighted_return'])
+
+# Calculate cumulative sum of the returns
+top_monthly_return['CumSum'] = top_monthly_return['log_weighted_return'].cumsum()
+bottom_monthly_return['CumSum'] = bottom_monthly_return['log_weighted_return'].cumsum()
+
+########### Time series graph equally weighted ###
+
+# Create a figure object with a width of 10 inches and a height of 5 inches
+fig = plt.figure(figsize=(20, 10))
+
+# Plot the data
+plt.plot(top_monthly_return['CALDT'], top_monthly_return['CumSum'], label='Top Decile')
+plt.plot(bottom_monthly_return['CALDT'], bottom_monthly_return['CumSum'], label='Bottom Decile')
+
+# Set the x-axis label
+plt.xlabel('Date')
+
+# Set the y-axis label
+plt.ylabel('Returns in decimals')
+
+# Set the title
+plt.title('Random Forest Cumulative Sum of Log Weighted Return of equally weighted portfolios')
+
+# Add a legend
+plt.legend()
+
+# Display the plot
+plt.show()
+
+############# metrics ##########
+
+print("Metrics for the Random Forest model")
+
+#mean monthly returns
+mean_top_equally_weighted= top_monthly_return['log_weighted_return'].mean()
+print("The mean monthly return of the top decile equally weighted portfolio is:", mean_top_equally_weighted)
+
+mean_bottom_equally_weighted= bottom_monthly_return['log_weighted_return'].mean()
+print("The mean monthly return of the bottom decile equally weighted portfolio is:", mean_bottom_equally_weighted)
+
+
+#standard deviation
+std_dev_top= np.std(top_monthly_return['log_weighted_return'])
+std_dev_bottom= np.std(bottom_monthly_return['log_weighted_return'])
+print("The standard Deviation of the top equally weighted portfolio is ", std_dev_top)
+print("The standard Deviation of the bottom equally weighted portfolio is ", std_dev_bottom)
+
+
+
+#Sharpe Ratio top decile
+sharpe_ratio_top = top_monthly_return['log_weighted_return'].mean() / top_monthly_return['log_weighted_return'].std()
+print("The sharpe ratio of the top equally weighted portfolio is ", sharpe_ratio_top)
+
+#Sharpe ratio bottom decile
+sharpe_ratio_bottom = bottom_monthly_return['log_weighted_return'].mean() / bottom_monthly_return['log_weighted_return'].std()
+print("The sharpe ratio of the bottom equally weighted portfolio is ",sharpe_ratio_bottom)
+
+last_cumsum_top_equally = top_monthly_return['CumSum'].iloc[-1]
+print("The total return of the top equally weighted portfolio over the whole period is :", last_cumsum_top_equally)
+
+annualized_return_top_equally= ((1+last_cumsum_top_equally)**(1/23))-1
+print("The annualized return of the top equally weighted portfolio is",annualized_return_top_equally)
+
+last_cumsum_bottom_equally = bottom_monthly_return['CumSum'].iloc[-1]
+print("The total return of the bottom equally weighted portfolio over the whole period is :", last_cumsum_bottom_equally)
+
+annualized_return_bottom_equally= ((1+last_cumsum_bottom_equally)**(1/23))-1
+print("The annualized return of the bottom equally weighted portfolio is",annualized_return_bottom_equally)
+
+#T-test top decile
+from scipy.stats import ttest_1samp
+t_statistic, p_value = ttest_1samp(top_monthly_return['log_weighted_return'], 0)
+print(f"The t-statistic of the top equally weighted portfolio is {t_statistic:.2f}")
+print(f"The p-value of the top equally weighted portfolio is {p_value:.2f}")
+
+#T-test bottom decile
+t_statistic, p_value = ttest_1samp(bottom_monthly_return['log_weighted_return'], 0)
+print(f"The t-statistic of the bottom equally weighted portfolio is {t_statistic:.2f}")
+print(f"The p-value of bottom equally weighted portfolio is {p_value:.2f}")
+
+#T-test top decile vs bottom decile
+from scipy.stats import ttest_ind
+t_statistic, p_value = ttest_ind(top_monthly_return['log_weighted_return'], bottom_monthly_return['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top against the bottom equally weighted portfolio is {t_statistic:.2f}")
+print(f"The p-value of the top against the bottom equally weighted portfolio is {p_value:.2f}")
+
+# Sortino Ratio
+downside_returns_top= np.minimum(top_monthly_return['log_weighted_return']- 0, 0)
+semi_deviation_top = np.std(downside_returns_top)
+sortino_ratio_top= top_monthly_return['log_weighted_return'].mean()/ semi_deviation_top
+print("The sortino ratio of the top equally weighted portfolio is", sortino_ratio_top)
+
+downside_returns_bottom= np.minimum(bottom_monthly_return['log_weighted_return']- 0, 0)
+semi_deviation_bottom = np.std(downside_returns_bottom)
+sortino_ratio_bottom= bottom_monthly_return['log_weighted_return'].mean()/ semi_deviation_bottom
+print("The sortino ratio of the bottom equally weighted portfolio is", sortino_ratio_bottom)
+
+# Information ratio
+information_ratio_top= np.mean(top_monthly_return['log_weighted_return'])/ std_dev_top
+information_ratio_bottom= np.mean(bottom_monthly_return['log_weighted_return'])/ std_dev_bottom
+print("The information ratio of the top equally weighted portfolio is", information_ratio_top)
+print("The information ratio of the bottom equally weighted portfolio is",information_ratio_bottom)
+
+
+######## number of fund per portfolio is the same for equally and asset weighted #####
+#Max amount of fund in a top portfolio
+max_nb_fund = max(num_of_fund_per_portfolio)
+
+#Min amount of fund in a portfolio
+min_nb_fund = min(num_of_fund_per_portfolio)
+
+#Avg amount of fund per portfolio
+avg_nb_fund = sum(num_of_fund_per_portfolio) / len(num_of_fund_per_portfolio)
+
+print(max_nb_fund, min_nb_fund, avg_nb_fund)
+
+#Max amount of fund in a bottom portfolio
+max_nb_fund = max(bottom_num_fund_per_portfolio)
+
+#Min amount of fund in a portfolio
+min_nb_fund = min(bottom_num_fund_per_portfolio)
+
+#Avg amount of fund per portfolio
+avg_nb_fund = sum(bottom_num_fund_per_portfolio) / len(bottom_num_fund_per_portfolio)
+
+print("The max number of fund per portfolio is", max_nb_fund)
+print("The min number of fund per portfolio is", min_nb_fund)
+print("The average number of fund per portfolio is", avg_nb_fund)
+
+
+############## Asset weighted portfolio ##################
+
+# Keep only the sum of returns for each month
+# Group by 'CALDT' and calculate the sum for each group, keeping the DataFrame format
+Asset_weighted_top_monthly_return = all_top_asset_weighted_monthly.groupby(pd.Grouper(key='CALDT', freq='M')).agg({'asset_weighted_return': 'sum'})
+Asset_weighted_top_monthly_return = Asset_weighted_top_monthly_return.reset_index()
+
+Asset_weighted_bottom_monthly_return = all_bottom_asset_weighted_monthly.groupby(pd.Grouper(key='CALDT', freq='M'))['asset_weighted_return'].sum()
+Asset_weighted_bottom_monthly_return = Asset_weighted_bottom_monthly_return.reset_index()
+
+# Calculate Log returns of Top Decile Portfolio
+Asset_weighted_top_monthly_return['log_asset_weighted_return'] = np.log(1 + Asset_weighted_top_monthly_return['asset_weighted_return'])
+Asset_weighted_bottom_monthly_return['log_asset_weighted_return'] = np.log(1 + Asset_weighted_bottom_monthly_return['asset_weighted_return'])
+
+# Calculate cumulative sum of the returns
+Asset_weighted_top_monthly_return['CumSum'] = Asset_weighted_top_monthly_return['log_asset_weighted_return'].cumsum()
+Asset_weighted_bottom_monthly_return['CumSum'] = Asset_weighted_bottom_monthly_return['log_asset_weighted_return'].cumsum()
+
+########### time series graph for asset weighted #######
+
+# Create a figure object with a width of 10 inches and a height of 5 inches
+fig = plt.figure(figsize=(20, 10))
+
+# Plot the data
+plt.plot(Asset_weighted_top_monthly_return['CALDT'], Asset_weighted_top_monthly_return['CumSum'], label='Top Decile')
+plt.plot(Asset_weighted_bottom_monthly_return['CALDT'], Asset_weighted_bottom_monthly_return['CumSum'], label='Bottom Decile')
+
+# Set the x-axis label
+plt.xlabel('Date')
+
+# Set the y-axis label
+plt.ylabel('Returns in decimals')
+
+# Set the title
+plt.title('Random Forest Cumulative Sum of Log Weighted Return of asset weighted portfolios')
+
+# Add a legend
+plt.legend()
+
+# Display the plot
+plt.show()
+
+############# metrics #######
+
+#Mean of asset weighted portfolio
+mean_top_asset_weighted= Asset_weighted_top_monthly_return['log_asset_weighted_return'].mean()
+print("The mean monthly return of the top asset weighted portfolio is", mean_top_asset_weighted)
+
+mean_bottom_asset_weighted= Asset_weighted_bottom_monthly_return['log_asset_weighted_return'].mean()
+print("The mean monthly return of the bottom asset weighted portfolio is", mean_bottom_asset_weighted)
+
+
+#standard deviation
+std_dev_top_asset_weighted= np.std(Asset_weighted_top_monthly_return['log_asset_weighted_return'])
+std_dev_bottom_asset_weighted= np.std(Asset_weighted_bottom_monthly_return['log_asset_weighted_return'])
+print("The standard deviation of the top asset weighted portfolio is", std_dev_top_asset_weighted)
+print("The standard deviation of the bottom asset weighted portfolio is", std_dev_bottom_asset_weighted)
+
+
+#Sharpe Ratio top decile
+sharpe_ratio_top_asset_weighted = Asset_weighted_top_monthly_return['log_asset_weighted_return'].mean() / Asset_weighted_top_monthly_return['log_asset_weighted_return'].std()
+print("The Sharpe ratio of the top asset weighted portfolio is", sharpe_ratio_top_asset_weighted)
+
+#Sharpe ratio bottom decile
+sharpe_ratio_bottom_asset_weighted = Asset_weighted_bottom_monthly_return['log_asset_weighted_return'].mean() / Asset_weighted_bottom_monthly_return['log_asset_weighted_return'].std()
+print("The Sharpe ratio of the bottom asset weighted portfolio is", sharpe_ratio_bottom_asset_weighted)
+
+last_cumsum_top_asset_weighted = Asset_weighted_top_monthly_return['CumSum'].iloc[-1]
+print("The total return of the top equally weighted portfolio over the whole period is :", last_cumsum_top_asset_weighted)
+
+annualized_return_top_asset_weighted= ((1+last_cumsum_top_asset_weighted)**(1/23))-1
+print("The annualized return of the top asset weighted portfolio is", annualized_return_top_asset_weighted)
+
+last_cumsum_bottom_asset_weighted = Asset_weighted_bottom_monthly_return['CumSum'].iloc[-1]
+print("The total return of the top equally weighted portfolio over the whole period is :", last_cumsum_bottom_asset_weighted)
+
+annualized_return_bottom_asset_weighted= ((1+last_cumsum_bottom_asset_weighted)**(1/23))-1
+print("The annualized return of the bottom asset weighted portfolio is",annualized_return_bottom_asset_weighted)
+
+#T-test top decile
+from scipy.stats import ttest_1samp
+t_statistic, p_value = ttest_1samp(Asset_weighted_top_monthly_return['log_asset_weighted_return'], 0)
+print(f"The t-statistic of the top decile of the asset weighted portfolio is {t_statistic:.2f}")
+print(f"The p-value of the top decile of the asset weighted portfolio is {p_value:.2f}")
+
+#T-test bottom decile
+t_statistic, p_value = ttest_1samp(Asset_weighted_bottom_monthly_return['log_asset_weighted_return'], 0)
+print(f"The t-statistic of the bottom decile of the asset weighted portfolio is is {t_statistic:.2f}")
+print(f"The p-value of the bottom decile of the asset weighted portfolio is is {p_value:.2f}")
+
+#T-test top decile vs bottom decile
+from scipy.stats import ttest_ind
+t_statistic, p_value = ttest_ind(Asset_weighted_top_monthly_return['log_asset_weighted_return'], Asset_weighted_bottom_monthly_return['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top decile against the bottom decile asset weighted portfolio is {t_statistic:.2f}")
+print(f"The p-value of the top decile against the bottom decile asset weighted portfolio is {p_value:.2f}")
+
+# Sortino Ratio
+downside_returns_top_asset_weighted= np.minimum(Asset_weighted_top_monthly_return['log_asset_weighted_return']- 0, 0)
+semi_deviation_top_asset_weighted = np.std(downside_returns_top_asset_weighted)
+sortino_ratio_top_asset_weighted= Asset_weighted_top_monthly_return['log_asset_weighted_return'].mean()/ semi_deviation_top_asset_weighted
+print("The Sortino ratio of the top asset weighted portfolio is", sortino_ratio_top_asset_weighted)
+
+downside_returns_bottom_asset_weighted= np.minimum(Asset_weighted_bottom_monthly_return['log_asset_weighted_return']- 0, 0)
+semi_deviation_bottom_asset_weighted = np.std(downside_returns_bottom_asset_weighted)
+sortino_ratio_bottom_asset_weighted= Asset_weighted_bottom_monthly_return['log_asset_weighted_return'].mean()/ semi_deviation_bottom_asset_weighted
+print("The Sortino ratio of the bottom asset weighted portfolio is", sortino_ratio_bottom_asset_weighted)
+
+# Information ratio
+information_ratio_top_asset_weighted= np.mean(Asset_weighted_top_monthly_return['log_asset_weighted_return'])/ std_dev_top_asset_weighted
+information_ratio_bottom_asset_weighted= np.mean(Asset_weighted_bottom_monthly_return['log_asset_weighted_return'])/ std_dev_bottom_asset_weighted
+print("The information ratio of the top asset weighted portfolio is", information_ratio_top_asset_weighted)
+print("The information ratio of the bottom asset weighted portfolio is", information_ratio_bottom_asset_weighted)
+
+
+########### #Characteristics analysis ##########
+
+# Correlation matrix between target variable and fund characteristics
+target_variable = ['alpha_FF5MOM', 'alpha_FF5MOM_shifted','R2_FF5MOM']
+
+selected_columns = [col for col in testing_data.columns if col not in target_variable]
+
+correlation_data = testing_data[selected_columns]
+
+correlation_matrix = correlation_data.corr()
+
+# Create a heatmap for the correlation matrix
+
+mask = np.zeros_like(correlation_matrix)
+mask[np.triu_indices_from(mask)] = True
+plt.figure(figsize=(40,40))
+sns.set(font_scale=1.6)
+sns.heatmap(correlation_matrix, mask=mask, cmap='coolwarm', annot=True, fmt='.2f', square=True)
+plt.title('Random Forest Correlation Heat Map', fontsize=50)
+plt.show()
+
+# Concatenate SHAP values along the first axis
+shap_values_array = np.concatenate(all_shap_values, axis=0)
+
+# Calculate average SHAP values across all iterations
+avg_shap_values = np.abs(np.mean(shap_values_array, axis=0))
+
+# Get feature names
+feature_names = x_train.columns 
+
+# Sort features by average absolute SHAP values
+sorted_indices = np.argsort(avg_shap_values)[::-1]
+sorted_feature_names = feature_names[sorted_indices]
+sorted_avg_shap_values = avg_shap_values[sorted_indices]
+
+# Create a bar plot
+plt.figure(figsize=(16, 12))
+plt.barh(sorted_feature_names, sorted_avg_shap_values, color='skyblue')
+plt.xlabel('Average Absolute SHAP Value')
+plt.title('Random Forest Feature Importance - Average Absolute SHAP Values')
+plt.show()
+
+
+t_statistic, p_value = ttest_ind(Asset_weighted_top_monthly_return['log_asset_weighted_return'], top_monthly_return['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the equally weighted against the asset weighted top portfolio is {t_statistic:.2f}")
+print(f"The p-value of the equally weighted against the asset weighted top portfolio is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(Asset_weighted_bottom_monthly_return['log_asset_weighted_return'], bottom_monthly_return['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the tequally weighted against the asset weighted bottom portfolio is {t_statistic:.2f}")
+print(f"The p-value of the equally weighted against the asset weighted bottom portfolio is {p_value:.2f}")
+
+
+top_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsEqually.csv', index=False)
+bottom_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsEqually.csv', index=False)
+Asset_weighted_top_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsAsset.csv', index=False)
+Asset_weighted_bottom_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsAsset.csv', index=False)
+
+
