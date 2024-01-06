@@ -1,0 +1,187 @@
+import pandas as pd
+from scipy.stats import ttest_ind
+import matplotlib.pyplot as plt
+
+
+OLS_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsEqually.csv")
+
+OLS_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsEqually.csv")
+
+OLS_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsAsset.csv")
+
+OLS_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsAsset.csv")
+
+
+GB_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_TopMonthlyReturnsEqually.csv")
+
+GB_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_BottomMonthlyReturnsEqually.csv")
+
+GB_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_TopMonthlyReturnsAsset.csv")
+
+GB_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_BottomMonthlyReturnsAsset.csv")
+
+
+DT_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_TopMonthlyReturnsEqually.csv")
+
+DT_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_BottomMonthlyReturnsEqually.csv")
+
+DT_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_TopMonthlyReturnsAsset.csv")
+
+DT_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DTBottomMonthlyReturnsAsset.csv")
+
+
+RF_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsEqually.csv")
+
+RF_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsEqually.csv")
+
+RF_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsAsset.csv")
+
+RF_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsAsset.csv")
+
+
+
+
+#OLS VS ML Top equally
+t_statistic, p_value = ttest_ind(OLS_top_decile_equally['log_weighted_return'], GB_top_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top equally weighted portfolio OLS VS GB is {t_statistic:.2f}")
+print(f"The p-value of the top equally weighted portfolio OLS VS GB is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_top_decile_equally['log_weighted_return'], DT_top_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top equally weighted portfolio OLS VS DT is {t_statistic:.2f}")
+print(f"The p-value of the top equally weighted portfolio OLS VS DT is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_top_decile_equally['log_weighted_return'], RF_top_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top equally weighted portfolio OLS VS RF is {t_statistic:.2f}")
+print(f"The p-value of the top equally weighted portfolio OLS VS RF is {p_value:.2f}")
+
+#OLS VS ML bottom equally 
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_equally['log_weighted_return'], GB_bottom_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom equally weighted portfolio OLS VS GB is {t_statistic:.2f}")
+print(f"The p-value of the bottom equally weighted portfolio OLS VS GB is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_equally['log_weighted_return'], DT_bottom_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom equally weighted portfolio OLS VS DT is {t_statistic:.2f}")
+print(f"The p-value of the bottom equally weighted portfolio OLS VS DT is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_equally['log_weighted_return'], RF_bottom_decile_equally['log_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom equally weighted portfolio OLS VS RF is {t_statistic:.2f}")
+print(f"The p-value of the bottom equally weighted portfolio OLS VS RF is {p_value:.2f}")
+
+
+
+
+
+
+
+#OLS VS ML top asset
+t_statistic, p_value = ttest_ind(OLS_top_decile_asset_weighted['log_asset_weighted_return'], GB_top_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top asset weighted portfolio OLS VS GB is {t_statistic:.2f}")
+print(f"The p-value of the top asset weighted portfolio OLS VS GB is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_top_decile_asset_weighted['log_asset_weighted_return'], DT_top_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top asset weighted portfolio OLS VS DT is {t_statistic:.2f}")
+print(f"The p-value of the top asset weighted portfolio OLS VS DT is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_top_decile_asset_weighted['log_asset_weighted_return'], RF_top_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the top asset weighted portfolio OLS VS RF is {t_statistic:.2f}")
+print(f"The p-value of the top asset weighted portfolio OLS VS RF is {p_value:.2f}")
+
+#OLS VS ML bottom asset
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_asset_weighted['log_asset_weighted_return'], GB_bottom_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom asset weighted portfolio OLS VS GB is {t_statistic:.2f}")
+print(f"The p-value of the bottom asset weighted portfolio OLS VS GB is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_asset_weighted['log_asset_weighted_return'], DT_bottom_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom asset weighted portfolio OLS VS DT is {t_statistic:.2f}")
+print(f"The p-value of the bottom asset weighted portfolio OLS VS DT is {p_value:.2f}")
+
+t_statistic, p_value = ttest_ind(OLS_bottom_decile_asset_weighted['log_asset_weighted_return'], RF_bottom_decile_asset_weighted['log_asset_weighted_return'], equal_var=False)
+print(f"The t-statistic of the bottom asset weighted portfolio OLS VS RF is {t_statistic:.2f}")
+print(f"The p-value of the bottom asset weighted portfolio OLS VS RF is {p_value:.2f}")
+
+
+
+
+# Test for significance between models 
+
+from scipy.stats import f_oneway
+
+# F-test top equally
+f_statistic, p_value = f_oneway(GB_top_decile_equally['log_weighted_return'], DT_top_decile_equally['log_weighted_return'], RF_top_decile_equally['log_weighted_return'])
+print("F-statistic top equally:", f_statistic)
+print("P-value top equally:", p_value)
+
+# F-test bottom equally
+f_statistic, p_value = f_oneway(GB_bottom_decile_equally['log_weighted_return'], DT_bottom_decile_equally['log_weighted_return'], RF_bottom_decile_equally['log_weighted_return'])
+print("F-statistic bottom equally:", f_statistic)
+print("P-value bottom equally:", p_value)
+
+# F-test top asset weighted
+f_statistic, p_value = f_oneway(GB_top_decile_asset_weighted['log_asset_weighted_return'], DT_top_decile_asset_weighted['log_asset_weighted_return'], RF_top_decile_asset_weighted['log_asset_weighted_return'])
+print("F-statistic top asset weighted:", f_statistic)
+print("P-value top asset weighted:", p_value)
+
+# F-test bottom asset weighted
+f_statistic, p_value = f_oneway(GB_bottom_decile_asset_weighted['log_asset_weighted_return'], DT_bottom_decile_asset_weighted['log_asset_weighted_return'], RF_bottom_decile_asset_weighted['log_asset_weighted_return'])
+print("F-statistic bottom asset weighted:", f_statistic)
+print("P-value bottom asset weighted:", p_value)
+
+
+
+# Plot the data
+
+# Plot the data
+# equally weighted 
+plt.figure(figsize=(40, 20))
+plt.plot(OLS_top_decile_equally['CALDT'], OLS_top_decile_equally['CumSum'], label='OLS Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], GB_top_decile_equally['CumSum'], label='GB Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], DT_top_decile_equally['CumSum'], label='DT Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], RF_top_decile_equally['CumSum'], label='RF Top Decile', linewidth=5)
+
+plt.plot(OLS_bottom_decile_equally['CALDT'], OLS_bottom_decile_equally['CumSum'], label='OLS Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], GB_bottom_decile_equally['CumSum'], label='GB Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], DT_bottom_decile_equally['CumSum'], label='DT Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], RF_bottom_decile_equally['CumSum'], label='RF Bottom Decile',linewidth=5)
+
+# Set the x-axis label
+plt.xlabel('Date', fontsize=40)
+
+# Set the y-axis label
+plt.ylabel('Returns in decimals', fontsize=40)
+
+# Set the title
+plt.title('Cumulative Sum of Log Weighted Return of equally weighted portfolios', fontsize=40)
+
+# Add a legend
+plt.legend(fontsize=30)
+
+# Display the plot
+plt.show()
+
+# asset weighted 
+plt.figure(figsize=(40, 20))
+plt.plot(OLS_top_decile_equally['CALDT'], OLS_top_decile_asset_weighted['CumSum'], label='OLS Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], GB_top_decile_asset_weighted['CumSum'], label='GB Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], DT_top_decile_asset_weighted['CumSum'], label='DT Top Decile', linewidth=5)
+plt.plot(OLS_top_decile_equally['CALDT'], RF_top_decile_asset_weighted['CumSum'], label='RF Top Decile', linewidth=5)
+
+plt.plot(OLS_bottom_decile_equally['CALDT'], OLS_bottom_decile_asset_weighted['CumSum'], label='OLS Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], GB_bottom_decile_asset_weighted['CumSum'], label='GB Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], DT_bottom_decile_asset_weighted['CumSum'], label='DT Bottom Decile',linewidth=5)
+plt.plot(OLS_bottom_decile_equally['CALDT'], RF_bottom_decile_asset_weighted['CumSum'], label='RF Bottom Decile',linewidth=5)
+
+# Set the x-axis label
+plt.xlabel('Date', fontsize=40)
+
+# Set the y-axis label
+plt.ylabel('Returns in decimals', fontsize=40)
+
+# Set the title
+plt.title('Cumulative Sum of Log Weighted Return of asset weighted portfolios', fontsize=40)
+
+# Add a legend
+plt.legend(fontsize=30)
+
+# Display the plot
+plt.show()
+
