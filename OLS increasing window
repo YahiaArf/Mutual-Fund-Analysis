@@ -21,7 +21,7 @@ import shap
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("/Users/yannickarfaoui/dataset_module_10.txt", delimiter=" ", low_memory=False)
+df = pd.read_csv("/Users/yahia/dataset_module_10.txt", delimiter=" ", low_memory=False)
 df['CALDT'] = pd.to_datetime(df['CALDT'])
 
 #Drop blanks from FUND_NAME
@@ -665,8 +665,8 @@ print(f"The p-value of the equally weighted against the asset weighted bottom po
 
 
 
-top_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsEqually.csv', index=False)
-bottom_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsEqually.csv', index=False)
-Asset_weighted_top_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsAsset.csv', index=False)
-Asset_weighted_bottom_monthly_return.to_parquet(r'/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsAsset.csv', index=False)
+top_monthly_return.to_parquet(r'/Users/yahia/Desktop/Module 11/OLS_TopMonthlyReturnsEqually.csv', index=False)
+bottom_monthly_return.to_parquet(r'/Users/yahia/Desktop/Module 11/OLS_BottomMonthlyReturnsEqually.csv', index=False)
+Asset_weighted_top_monthly_return.to_parquet(r'/Users/yahia/Desktop/Module 11/OLS_TopMonthlyReturnsAsset.csv', index=False)
+Asset_weighted_bottom_monthly_return.to_parquet(r'/Users/yahia/Desktop/Module 11/OLS_BottomMonthlyReturnsAsset.csv', index=False)
 
