@@ -3,40 +3,40 @@ from scipy.stats import ttest_ind
 import matplotlib.pyplot as plt
 
 
-OLS_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsEqually.csv")
+OLS_top_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/OLS_TopMonthlyReturnsEqually.csv")
 
-OLS_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsEqually.csv")
+OLS_bottom_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/OLS_BottomMonthlyReturnsEqually.csv")
 
-OLS_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_TopMonthlyReturnsAsset.csv")
+OLS_top_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/OLS_TopMonthlyReturnsAsset.csv")
 
-OLS_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/OLS_BottomMonthlyReturnsAsset.csv")
-
-
-GB_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_TopMonthlyReturnsEqually.csv")
-
-GB_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_BottomMonthlyReturnsEqually.csv")
-
-GB_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_TopMonthlyReturnsAsset.csv")
-
-GB_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/GB_BottomMonthlyReturnsAsset.csv")
+OLS_bottom_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/OLS_BottomMonthlyReturnsAsset.csv")
 
 
-DT_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_TopMonthlyReturnsEqually.csv")
+GB_top_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/GB_TopMonthlyReturnsEqually.csv")
 
-DT_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_BottomMonthlyReturnsEqually.csv")
+GB_bottom_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/GB_BottomMonthlyReturnsEqually.csv")
 
-DT_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DT_TopMonthlyReturnsAsset.csv")
+GB_top_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/GB_TopMonthlyReturnsAsset.csv")
 
-DT_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/DTBottomMonthlyReturnsAsset.csv")
+GB_bottom_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/GB_BottomMonthlyReturnsAsset.csv")
 
 
-RF_top_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsEqually.csv")
+DT_top_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/DT_TopMonthlyReturnsEqually.csv")
 
-RF_bottom_decile_equally= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsEqually.csv")
+DT_bottom_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/DT_BottomMonthlyReturnsEqually.csv")
 
-RF_top_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_TopMonthlyReturnsAsset.csv")
+DT_top_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/DT_TopMonthlyReturnsAsset.csv")
 
-RF_bottom_decile_asset_weighted= pd.read_parquet("/Users/yannickarfaoui/Desktop/Module 11/RF_BottomMonthlyReturnsAsset.csv")
+DT_bottom_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/DTBottomMonthlyReturnsAsset.csv")
+
+
+RF_top_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/RF_TopMonthlyReturnsEqually.csv")
+
+RF_bottom_decile_equally= pd.read_parquet("/Users/yahia/Desktop/Module 11/RF_BottomMonthlyReturnsEqually.csv")
+
+RF_top_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/RF_TopMonthlyReturnsAsset.csv")
+
+RF_bottom_decile_asset_weighted= pd.read_parquet("/Users/yahia/Desktop/Module 11/RF_BottomMonthlyReturnsAsset.csv")
 
 
 
